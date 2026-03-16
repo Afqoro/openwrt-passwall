@@ -1,0 +1,256 @@
+name: Build Passwall
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'luci-app-passwall/**'
+      - '.github/workflows/build-passwall.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64_generic
+            sdk_target: armsr-armv8
+            sdk_url: https://downloads.openwrt.org/releases/24.10.5/targets/armsr/armv8/openwrt-sdk-24.10.5-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+            sdk_archive: openwrt-sdk-24.10.5-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
+
+    env:
+      PKG_NAME: passwall
+      LUCI_PKG_NAME: luci-app-passwall
+
+    steps:
+      - name: Checkout passwall source
+        uses: actions/checkout@v5
+        with:
+          path: passwall-source
+
+      - name: Checkout passwall packages source
+        uses: actions/checkout@v5
+        with:
+          repository: Openwrt-Passwall/openwrt-passwall-packages
+          path: passwall-packages
+
+      - name: Read package version
+        run: |
+          PKG_VERSION=$(sed -n 's/^PKG_VERSION:=//p' passwall-source/luci-app-passwall/Makefile | head -n1 | tr -d '[:space:]')
+          if [ -z "$PKG_VERSION" ]; then
+            echo "PKG_VERSION not found in passwall-source/luci-app-passwall/Makefile"
+            exit 1
+          fi
+
+          echo "PKG_VERSION=$PKG_VERSION" >> "$GITHUB_ENV"
+          echo "ARCHIVE_NAME=passwall-${{ matrix.arch }}-$PKG_VERSION.tar.gz" >> "$GITHUB_ENV"
+
+          echo "=================================================="
+          echo "Package     : luci-app-passwall"
+          echo "Version     : $PKG_VERSION"
+          echo "Target Arch : ${{ matrix.arch }}"
+          echo "SDK Target  : ${{ matrix.sdk_target }}"
+          echo "Archive     : passwall-${{ matrix.arch }}-$PKG_VERSION.tar.gz"
+          echo "=================================================="
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            gettext git libncurses5-dev libssl-dev rsync unzip zlib1g-dev \
+            file wget subversion swig time tar zstd python3 python3-pip python3-setuptools curl
+
+      - name: Cache SDK archive
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.sdk_archive }}
+          key: sdk-${{ matrix.sdk_target }}-${{ matrix.sdk_archive }}
+
+      - name: Download OpenWrt SDK
+        run: |
+          if [ ! -f "${{ matrix.sdk_archive }}" ]; then
+            wget -O "${{ matrix.sdk_archive }}" "${{ matrix.sdk_url }}"
+          fi
+
+          echo "=================================================="
+          echo "Downloaded SDK archive:"
+          ls -lh "${{ matrix.sdk_archive }}"
+          echo "=================================================="
+
+      - name: Extract OpenWrt SDK
+        run: |
+          find . -maxdepth 1 -type d -name 'openwrt-sdk-*' -exec rm -rf {} +
+          tar --use-compress-program=unzstd -xf "${{ matrix.sdk_archive }}"
+          SDK_DIR=$(find . -maxdepth 1 -type d -name "openwrt-sdk-*" | head -n 1)
+
+          if [ -z "$SDK_DIR" ]; then
+            echo "SDK_DIR not found after extraction"
+            exit 1
+          fi
+
+          echo "SDK_DIR=$SDK_DIR" >> "$GITHUB_ENV"
+
+          echo "=================================================="
+          echo "Using SDK_DIR=$SDK_DIR"
+          echo "=================================================="
+
+      - name: Prepare custom packages
+        run: |
+          mkdir -p "$SDK_DIR/package/custom"
+
+          rm -rf "$SDK_DIR/package/custom/luci-app-passwall"
+          rm -rf "$SDK_DIR/package/custom/chinadns-ng"
+          rm -rf "$SDK_DIR/package/custom/dns2socks"
+          rm -rf "$SDK_DIR/package/custom/tcping"
+
+          cp -r "$GITHUB_WORKSPACE/passwall-source/luci-app-passwall" "$SDK_DIR/package/custom/luci-app-passwall"
+          cp -r "$GITHUB_WORKSPACE/passwall-packages/chinadns-ng" "$SDK_DIR/package/custom/chinadns-ng"
+          cp -r "$GITHUB_WORKSPACE/passwall-packages/dns2socks" "$SDK_DIR/package/custom/dns2socks"
+          cp -r "$GITHUB_WORKSPACE/passwall-packages/tcping" "$SDK_DIR/package/custom/tcping"
+
+          echo "=================================================="
+          echo "Custom packages prepared:"
+          ls -la "$SDK_DIR/package/custom"
+          echo "=================================================="
+
+      - name: Update feeds
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install luci
+
+          echo "=================================================="
+          echo "Feeds updated"
+          echo "=================================================="
+
+      - name: Generate config
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          cat >> .config <<'EOF'
+          CONFIG_PACKAGE_luci-app-passwall=m
+          CONFIG_PACKAGE_chinadns-ng=m
+          CONFIG_PACKAGE_dns2socks=m
+          CONFIG_PACKAGE_tcping=m
+          EOF
+
+          make defconfig
+
+          echo "=================================================="
+          echo "Config generated"
+          echo "=================================================="
+
+      - name: Build packages
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          echo "=================================================="
+          echo "Start building chinadns-ng"
+          echo "=================================================="
+          make package/custom/chinadns-ng/compile V=s -j"$(nproc)"
+
+          echo "=================================================="
+          echo "Start building dns2socks"
+          echo "=================================================="
+          make package/custom/dns2socks/compile V=s -j"$(nproc)"
+
+          echo "=================================================="
+          echo "Start building tcping"
+          echo "=================================================="
+          make package/custom/tcping/compile V=s -j"$(nproc)"
+
+          echo "=================================================="
+          echo "Start building luci-app-passwall"
+          echo "=================================================="
+          make package/custom/luci-app-passwall/compile V=s -j"$(nproc)"
+
+      - name: Collect IPK files
+        run: |
+          mkdir -p "artifacts/${{ matrix.arch }}"
+
+          find "$SDK_DIR/bin/packages" -type f \
+            \( -name 'luci-app-passwall_*.ipk' \
+            -o -name 'chinadns-ng_*.ipk' \
+            -o -name 'dns2socks_*.ipk' \
+            -o -name 'tcping_*.ipk' \) \
+            -exec cp -v {} "artifacts/${{ matrix.arch }}/" \;
+
+          echo "=================================================="
+          echo "Collected IPK files:"
+          ls -lh "artifacts/${{ matrix.arch }}/"
+          echo "=================================================="
+
+      - name: Create tar.gz package
+        run: |
+          tar -czf "$ARCHIVE_NAME" -C "artifacts/${{ matrix.arch }}" .
+
+          echo "=================================================="
+          echo "Created archive:"
+          ls -lh "$ARCHIVE_NAME"
+          echo "=================================================="
+
+      - name: Generate SHA256
+        run: |
+          sha256sum "$ARCHIVE_NAME" | awk '{print $1}' > sha256.txt
+          echo "SHA256=$(cat sha256.txt)" >> "$GITHUB_ENV"
+
+          echo "=================================================="
+          echo "SHA256:"
+          cat sha256.txt
+          echo "=================================================="
+
+      - name: Upload file to API endpoint
+        env:
+          UPLOAD_URL: ${{ secrets.UPLOAD_URL }}
+          UPLOAD_API_KEY: ${{ secrets.UPLOAD_API_KEY }}
+        run: |
+          echo "=================================================="
+          echo "Uploading archive to API endpoint"
+          echo "=================================================="
+
+          RESPONSE="$(
+            curl --fail --show-error --silent \
+              -X POST "$UPLOAD_URL" \
+              -H "Authorization: Bearer $UPLOAD_API_KEY" \
+              -F "file=@$ARCHIVE_NAME" \
+              -F "category=ipk_mod_public" \
+              -F "subfolder=${{ matrix.arch }}" \
+              -F "repository=${{ github.repository }}" \
+              -F "sha256=${SHA256}" \
+              -F "notify_telegram=1" \
+              -F "pkg_name=passwall" \
+              -F "pkg_version=${PKG_VERSION}" \
+              -F "arch=${{ matrix.arch }}" \
+              -F "mod_name=MahaVPN" \
+              -F "caption_title=Passwall build automation"
+          )"
+
+          python3 - <<'PY' "$RESPONSE"
+          import json, sys
+          data = json.loads(sys.argv[1])
+          print("==================================================")
+          print(f"success : {data.get('success')}")
+          print(f"message : {data.get('message')}")
+          if data.get("data"):
+              import json as _json
+              print("payload :")
+              print(_json.dumps(data["data"], indent=2))
+          print("==================================================")
+          PY
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: passwall-${{ matrix.arch }}
+          path: |
+            ${{ env.ARCHIVE_NAME }}
+            artifacts/${{ matrix.arch }}/*.ipk
+            sha256.txt
+
+      - name: Done
+        run: |
+          echo "=================================================="
+          echo "Build and upload finished successfully"
+          echo "=================================================="
