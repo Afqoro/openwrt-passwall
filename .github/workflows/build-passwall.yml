@@ -18,6 +18,7 @@ jobs:
         include:
           - arch: aarch64_generic
             sdk_target: armsr-armv8
+            release_prefix: 23.05-24.10
             sdk_url: https://downloads.openwrt.org/releases/24.10.5/targets/armsr/armv8/openwrt-sdk-24.10.5-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
             sdk_archive: openwrt-sdk-24.10.5-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
 
@@ -166,7 +167,7 @@ jobs:
           echo "=================================================="
           make package/custom/luci-app-passwall/compile V=s -j"$(nproc)"
 
-      - name: Collect IPK files
+      - name: Collect and rename IPK files
         run: |
           mkdir -p "artifacts/${{ matrix.arch }}"
 
@@ -174,11 +175,14 @@ jobs:
             \( -name 'luci-app-passwall_*.ipk' \
             -o -name 'chinadns-ng_*.ipk' \
             -o -name 'dns2socks_*.ipk' \
-            -o -name 'tcping_*.ipk' \) \
-            -exec cp -v {} "artifacts/${{ matrix.arch }}/" \;
+            -o -name 'tcping_*.ipk' \) | while read -r file; do
+              base="$(basename "$file")"
+              new_name="${{ matrix.release_prefix }}_${base}"
+              cp -v "$file" "artifacts/${{ matrix.arch }}/${new_name}"
+            done
 
           echo "=================================================="
-          echo "Collected IPK files:"
+          echo "Collected and renamed IPK files:"
           ls -lh "artifacts/${{ matrix.arch }}/"
           echo "=================================================="
 

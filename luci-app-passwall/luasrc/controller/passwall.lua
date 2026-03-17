@@ -1022,12 +1022,19 @@ end
 function flush_set()
 	local redirect = http.formvalue("redirect") or "0"
 	local reload = http.formvalue("reload") or "0"
+
 	if reload == "1" then
 		uci:set(appname, '@global[0]', "flush_set", "1")
 		api.uci_save(uci, appname, true, true)
 	else
 		api.sh_uci_set(appname, "@global[0]", "flush_set", "1", true)
 	end
+
+	local enabled = uci:get(appname, "@global[0]", "enabled") or "0"
+	if enabled == "1" then
+		luci.sys.call("(sleep 1; /etc/init.d/passwall restart) >/dev/null 2>&1 &")
+	end
+
 	if redirect == "1" then
 		http.redirect(api.url("log"))
 	end

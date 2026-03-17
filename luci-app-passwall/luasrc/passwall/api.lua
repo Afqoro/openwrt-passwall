@@ -1420,14 +1420,28 @@ end
 
 function set_apply_on_parse(map)
 	if not map then return end
-	if is_js_luci() then
-		apply_redirect(map)
-		local old = map.on_after_save
-		map.on_after_save = function(self)
-			if old then old(self) end
-			map:set("@global[0]", "timestamp", os.time())
+
+	local old_on_after_apply = map.on_after_apply
+	map.on_after_apply = function(self, ...)
+		local enabled = uci:get_first("passwall", "global", "enabled")
+		local ret
+
+		if old_on_after_apply then
+			ret = old_on_after_apply(self, ...)
 		end
-		-- 优化页面
+
+		if enabled == "1" then
+			sys.call("(sleep 1; /etc/init.d/passwall enable; /etc/init.d/passwall restart) >/dev/null 2>&1 &")
+		else
+			sys.call("(sleep 1; /etc/init.d/passwall stop; /etc/init.d/passwall disable) >/dev/null 2>&1 &")
+		end
+
+		return ret
+	end
+
+	if is_js_luci() then
+		map.apply_on_parse = true
+
 		local cbi = require "luci.cbi"
 		map:append(cbi.Template(appname .. "/cbi/optimize_cbi_ui"))
 	end
