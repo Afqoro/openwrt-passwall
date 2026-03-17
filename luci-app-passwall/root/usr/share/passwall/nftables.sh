@@ -105,7 +105,7 @@ insert_rule_after() {
 
 RULE_LAST_INDEX() {
 	[ $# -ge 3 ] || {
-		echolog "索引列举方式不正确（nftables），终止执行！"
+		echolog "Index enumeration method is incorrect (nftables), execution terminated!"
 		return 1
 	}
 	local table_name="${1}"; shift
@@ -766,7 +766,7 @@ filter_haproxy() {
 	for item in ${haproxy_items}; do
 		get_host_ip ipv4 $(echo $item | awk -F ":" '{print $1}') 1
 	done | insert_nftset $NFTSET_VPS "-1"
-	echolog "  - [$?]加入负载均衡的节点到nftset[$NFTSET_VPS]直连完成"
+	echolog "-[$?]Add load balancing node to nftset[$NFTSET_VPS] direct connection completed"
 }
 
 filter_vps_addr() {
@@ -781,9 +781,9 @@ filter_vps_addr() {
 
 filter_vpsip() {
 	uci show $CONFIG | grep -E "(.address=|.download_address=)" | cut -d "'" -f 2 | grep -E "([0-9]{1,3}[\.]){3}[0-9]{1,3}" | grep -v "^127\.0\.0\.1$" | insert_nftset $NFTSET_VPS "-1"
-	echolog "  - [$?]加入所有IPv4节点到nftset[$NFTSET_VPS]直连完成"
+	echolog "-[$?]Add all IPv4 nodes to nftset[$NFTSET_VPS] direct connection completed"
 	uci show $CONFIG | grep -E "(.address=|.download_address=)" | cut -d "'" -f 2 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | insert_nftset $NFTSET_VPS6 "-1"
-	echolog "  - [$?]加入所有IPv6节点到nftset[$NFTSET_VPS6]直连完成"
+	echolog "-[$?]Add all IPv6 nodes to nftset[$NFTSET_VPS6] direct connection completed"
 	#订阅方式为直连时
 	get_subscribe_host | grep -E "([0-9]{1,3}[\.]){3}[0-9]{1,3}" | grep -v "^127\.0\.0\.1$" | sed -e "/^$/d" | insert_nftset $NFTSET_VPS "-1"
 	get_subscribe_host | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | sed -e "/^$/d" | insert_nftset $NFTSET_VPS6 "-1"
@@ -832,7 +832,7 @@ filter_direct_node_list() {
 }
 
 add_firewall_rule() {
-	echolog "开始加载 nftables 防火墙规则..."
+	echolog "Starting to load firewall rules..."
 	gen_nft_tables
 	gen_nftset $NFTSET_WAN ipv4_addr 0 "-1"
 	gen_nftset $NFTSET_VPS ipv4_addr 0 "-1"
@@ -902,7 +902,7 @@ add_firewall_rule() {
 			if [ -n "$GEOIP_CODE" ]; then
 				get_geoip $GEOIP_CODE ipv4 | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | insert_nftset $NFTSET_WHITE "0"
 				get_geoip $GEOIP_CODE ipv6 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | insert_nftset $NFTSET_WHITE6 "0"
-				echolog "  - [$?]解析并加入[直连列表] GeoIP 到 NFTSET 完成"
+				echolog "-[$?] Parsing and adding [direct connection list] GeoIP to NFTSET completed"
 			fi
 		}
 	}
@@ -916,7 +916,7 @@ add_firewall_rule() {
 			if [ -n "$GEOIP_CODE" ]; then
 				get_geoip $GEOIP_CODE ipv4 | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | insert_nftset $NFTSET_BLACK "0"
 				get_geoip $GEOIP_CODE ipv6 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | insert_nftset $NFTSET_BLACK6 "0"
-				echolog "  - [$?]解析并加入[代理列表] GeoIP 到 NFTSET 完成"
+				echolog "-[$?] Parsing and adding [proxy list] GeoIP to NFTSET completed"
 			fi
 		}
 	}
@@ -930,7 +930,7 @@ add_firewall_rule() {
 			if [ -n "$GEOIP_CODE" ]; then
 				get_geoip $GEOIP_CODE ipv4 | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | insert_nftset $NFTSET_BLOCK "0"
 				get_geoip $GEOIP_CODE ipv6 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | insert_nftset $NFTSET_BLOCK6 "0"
-				echolog "  - [$?]解析并加入[屏蔽列表] GeoIP 到 NFTSET 完成"
+				echolog "-[$?] Parsing and adding [blocklist] GeoIP to NFTSET completed"
 			fi
 		}
 	}
@@ -950,7 +950,7 @@ add_firewall_rule() {
 		if [ -n "$GEOIP_CODE" ]; then
 			get_geoip $GEOIP_CODE ipv4 | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | insert_nftset $NFTSET_SHUNT "0"
 			get_geoip $GEOIP_CODE ipv6 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | insert_nftset $NFTSET_SHUNT6 "0"
-			echolog "  - [$?]解析并加入[分流节点] GeoIP 到 NFTSET 完成"
+			echolog "-[$?] Parsing and adding [Diversion Node] GeoIP to NFTSET completed"
 		fi
 	}
 
@@ -974,7 +974,7 @@ add_firewall_rule() {
 		#echolog "处理 ISP DNS 例外..."
 		echo "$ISP_DNS" | insert_nftset $NFTSET_WHITE 0
 		for ispip in $ISP_DNS; do
-			echolog "  - [$?]追加ISP IPv4 DNS到白名单：${ispip}"
+			echolog " - [$?] Append ISP IPv4 DNS to whitelist: ${ispip}"
 		done
 	}
 
@@ -982,7 +982,7 @@ add_firewall_rule() {
 		#echolog "处理 ISP IPv6 DNS 例外..."
 		echo $ISP_DNS6 | insert_nftset $NFTSET_WHITE6 0
 		for ispip6 in $ISP_DNS6; do
-			echolog "  - [$?]追加ISP IPv6 DNS到白名单：${ispip6}"
+			echolog " - [$?] Append ISP IPv6 DNS to whitelist: ${ispip6}"
 		done
 	}
 
@@ -1119,11 +1119,11 @@ add_firewall_rule() {
 			if echo "$dns_address" | grep -q -v ':'; then
 				nft "add rule $NFTABLE_NAME PSW_OUTPUT_MANGLE ip protocol udp ip daddr ${dns_address} $(factor ${dns_port:-53} "udp dport") counter return"
 				nft "add rule $NFTABLE_NAME PSW_OUTPUT_MANGLE ip protocol tcp ip daddr ${dns_address} $(factor ${dns_port:-53} "tcp dport") counter return"
-				echolog "  - [$?]追加直连DNS到nftables：${dns_address}:${dns_port:-53}"
+				echolog " - [$?] Append direct DNS to nftables: ${dns_address}:${dns_port:-53}"
 			else
 				nft "add rule $NFTABLE_NAME PSW_OUTPUT_MANGLE_V6 meta l4proto udp ip6 daddr ${dns_address} $(factor ${dns_port:-53} "udp dport") counter return"
 				nft "add rule $NFTABLE_NAME PSW_OUTPUT_MANGLE_V6 meta l4proto tcp ip6 daddr ${dns_address} $(factor ${dns_port:-53} "tcp dport") counter return"
-				echolog "  - [$?]追加直连DNS到nftables：[${dns_address}]:${dns_port:-53}"
+				echolog " - [$?] Append direct DNS to nftables: [${dns_address}]:${dns_port:-53}"
 			fi
 		done
 	}
