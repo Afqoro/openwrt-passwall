@@ -43,10 +43,17 @@ jobs:
           repository: Openwrt-Passwall/openwrt-passwall-packages
           path: passwall-packages
 
+      - name: Init build log
+        run: |
+          : > "$RUNNER_TEMP/build.log"
+          echo "BUILD_START_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+          echo "[$(date '+%H:%M:%S')] checkout....OK" >> "$RUNNER_TEMP/build.log"
+    
       - name: Read package version
         run: |
           PKG_VERSION=$(sed -n 's/^PKG_VERSION:=//p' passwall-source/luci-app-passwall/Makefile | head -n1 | tr -d '[:space:]')
           if [ -z "$PKG_VERSION" ]; then
+            echo "[$(date '+%H:%M:%S')] read ver....FAIL" >> "$RUNNER_TEMP/build.log"
             echo "PKG_VERSION not found in passwall-source/luci-app-passwall/Makefile"
             exit 1
           fi
@@ -59,17 +66,22 @@ jobs:
           echo "Version     : $PKG_VERSION"
           echo "Target Arch : ${{ matrix.arch }}"
           echo "SDK Target  : ${{ matrix.sdk_target }}"
-          echo "OpenWrt Series : $OPENWRT_SERIES"
           echo "Archive     : passwall-${{ matrix.arch }}-$PKG_VERSION.tar.gz"
           echo "=================================================="
 
+          echo "[$(date '+%H:%M:%S')] read ver....OK" >> "$RUNNER_TEMP/build.log"
+
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          if sudo apt-get update && sudo apt-get install -y \
             build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
             gettext git libncurses5-dev libssl-dev rsync unzip zlib1g-dev \
-            file wget subversion swig time tar zstd python3 python3-pip python3-setuptools curl
+            file wget subversion swig time tar zstd python3 python3-pip python3-setuptools curl; then
+            echo "[$(date '+%H:%M:%S')] deps........OK" >> "$RUNNER_TEMP/build.log"
+          else
+            echo "[$(date '+%H:%M:%S')] deps........FAIL" >> "$RUNNER_TEMP/build.log"
+            exit 1
+          fi
 
       - name: Resolve latest OpenWrt SDK
         id: resolve_sdk
@@ -78,6 +90,15 @@ jobs:
           sdk_path: ${{ matrix.sdk_path }}
           sdk_target: ${{ matrix.sdk_target }}
           openwrt_series: ${{ env.OPENWRT_SERIES }}
+    
+      - name: Show resolved SDK info
+        run: |
+          echo "=================================================="
+          echo "OpenWrt Version : ${{ steps.resolve_sdk.outputs.openwrt_version }}"
+          echo "SDK Archive     : ${{ steps.resolve_sdk.outputs.sdk_archive }}"
+          echo "SDK URL         : ${{ steps.resolve_sdk.outputs.sdk_url }}"
+          echo "=================================================="
+          echo "[$(date '+%H:%M:%S')] sdk detect..OK" >> "$RUNNER_TEMP/build.log"
     
       - name: Restore SDK cache
         uses: actions/cache@v4
@@ -91,13 +112,18 @@ jobs:
           SDK_URL="${{ steps.resolve_sdk.outputs.sdk_url }}"
 
           if [ ! -f "$SDK_ARCHIVE" ]; then
-            wget -O "$SDK_ARCHIVE" "$SDK_URL"
+            if ! wget -O "$SDK_ARCHIVE" "$SDK_URL"; then
+              echo "[$(date '+%H:%M:%S')] sdk dl.....FAIL" >> "$RUNNER_TEMP/build.log"
+              exit 1
+            fi
           fi
 
           echo "=================================================="
           echo "Downloaded SDK archive:"
           ls -lh "$SDK_ARCHIVE"
           echo "=================================================="
+
+          echo "[$(date '+%H:%M:%S')] sdk dl.....OK" >> "$RUNNER_TEMP/build.log"
 
       - name: Delete stale SDK caches for same target
         env:
@@ -176,11 +202,20 @@ jobs:
         run: |
           SDK_ARCHIVE="${{ steps.resolve_sdk.outputs.sdk_archive }}"
 
-          find . -maxdepth 1 -type d -name 'openwrt-sdk-*' -exec rm -rf {} +
-          tar --use-compress-program=unzstd -xf "$SDK_ARCHIVE"
+          if ! find . -maxdepth 1 -type d -name 'openwrt-sdk-*' -exec rm -rf {} +; then
+            echo "[$(date '+%H:%M:%S')] sdk xtract..FAIL" >> "$RUNNER_TEMP/build.log"
+            exit 1
+          fi
+
+          if ! tar --use-compress-program=unzstd -xf "$SDK_ARCHIVE"; then
+            echo "[$(date '+%H:%M:%S')] sdk xtract..FAIL" >> "$RUNNER_TEMP/build.log"
+            exit 1
+          fi
+
           SDK_DIR=$(find . -maxdepth 1 -type d -name "openwrt-sdk-*" | head -n 1)
 
           if [ -z "$SDK_DIR" ]; then
+            echo "[$(date '+%H:%M:%S')] sdk xtract..FAIL" >> "$RUNNER_TEMP/build.log"
             echo "SDK_DIR not found after extraction"
             exit 1
           fi
@@ -190,6 +225,8 @@ jobs:
           echo "=================================================="
           echo "Using SDK_DIR=$SDK_DIR"
           echo "=================================================="
+
+          echo "[$(date '+%H:%M:%S')] sdk xtract..OK" >> "$RUNNER_TEMP/build.log"
 
       - name: Prepare custom packages
         run: |
@@ -210,15 +247,20 @@ jobs:
           ls -la "$SDK_DIR/package/custom"
           echo "=================================================="
 
+          echo "[$(date '+%H:%M:%S')] prep feed...OK" >> "$RUNNER_TEMP/build.log"
+
       - name: Update feeds
         working-directory: ${{ env.SDK_DIR }}
         run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install luci
-
-          echo "=================================================="
-          echo "Feeds updated"
-          echo "=================================================="
+          if ./scripts/feeds update -a && ./scripts/feeds install luci; then
+            echo "=================================================="
+            echo "Feeds updated"
+            echo "=================================================="
+            echo "[$(date '+%H:%M:%S')] feeds.......OK" >> "$RUNNER_TEMP/build.log"
+          else
+            echo "[$(date '+%H:%M:%S')] feeds.......FAIL" >> "$RUNNER_TEMP/build.log"
+            exit 1
+          fi
 
       - name: Generate config
         working-directory: ${{ env.SDK_DIR }}
@@ -230,15 +272,21 @@ jobs:
           CONFIG_PACKAGE_tcping=m
           EOF
 
-          make defconfig
-
-          echo "=================================================="
-          echo "Config generated"
-          echo "=================================================="
+          if make defconfig; then
+            echo "=================================================="
+            echo "Config generated"
+            echo "=================================================="
+            echo "[$(date '+%H:%M:%S')] defconfig...OK" >> "$RUNNER_TEMP/build.log"
+          else
+            echo "[$(date '+%H:%M:%S')] defconfig...FAIL" >> "$RUNNER_TEMP/build.log"
+            exit 1
+          fi
 
       - name: Build packages
         working-directory: ${{ env.SDK_DIR }}
         run: |
+          set -e
+
           echo "=================================================="
           echo "Start building chinadns-ng"
           echo "=================================================="
@@ -259,82 +307,122 @@ jobs:
           echo "=================================================="
           make package/custom/luci-app-passwall/compile V=s -j"$(nproc)"
 
+          echo "[$(date '+%H:%M:%S')] build.......OK" >> "$RUNNER_TEMP/build.log"
+
       - name: Collect and rename IPK files
         run: |
           mkdir -p "artifacts/${{ matrix.arch }}"
 
-          find "$SDK_DIR/bin/packages" -type f \
+          if find "$SDK_DIR/bin/packages" -type f \
             \( -name 'luci-app-passwall_*.ipk' \
             -o -name 'chinadns-ng_*.ipk' \
             -o -name 'dns2socks_*.ipk' \
             -o -name 'tcping_*.ipk' \) | while read -r file; do
-              base="$(basename "$file")"
-              new_name="${{ matrix.release_prefix }}_${base}"
-              cp -v "$file" "artifacts/${{ matrix.arch }}/${new_name}"
-            done
-
-          echo "=================================================="
-          echo "Collected and renamed IPK files:"
-          ls -lh "artifacts/${{ matrix.arch }}/"
-          echo "=================================================="
+                base="$(basename "$file")"
+                new_name="${{ matrix.release_prefix }}_${base}"
+                cp -v "$file" "artifacts/${{ matrix.arch }}/${new_name}"
+              done; then
+            echo "=================================================="
+            echo "Collected and renamed IPK files:"
+            ls -lh "artifacts/${{ matrix.arch }}/"
+            echo "=================================================="
+            echo "[$(date '+%H:%M:%S')] collect.....OK" >> "$RUNNER_TEMP/build.log"
+          else
+            echo "[$(date '+%H:%M:%S')] collect.....FAIL" >> "$RUNNER_TEMP/build.log"
+            exit 1
+          fi
 
       - name: Create tar.gz package
         run: |
-          tar -czf "$ARCHIVE_NAME" -C "artifacts/${{ matrix.arch }}" .
-
-          echo "=================================================="
-          echo "Created archive:"
-          ls -lh "$ARCHIVE_NAME"
-          echo "=================================================="
+          if tar -czf "$ARCHIVE_NAME" -C "artifacts/${{ matrix.arch }}" .; then
+            echo "=================================================="
+            echo "Created archive:"
+            ls -lh "$ARCHIVE_NAME"
+            echo "=================================================="
+            echo "[$(date '+%H:%M:%S')] archive.....OK" >> "$RUNNER_TEMP/build.log"
+          else
+            echo "[$(date '+%H:%M:%S')] archive.....FAIL" >> "$RUNNER_TEMP/build.log"
+            exit 1
+          fi
 
       - name: Generate SHA256
         run: |
-          sha256sum "$ARCHIVE_NAME" | awk '{print $1}' > sha256.txt
-          echo "SHA256=$(cat sha256.txt)" >> "$GITHUB_ENV"
+          if sha256sum "$ARCHIVE_NAME" | awk '{print $1}' > sha256.txt; then
+            echo "SHA256=$(cat sha256.txt)" >> "$GITHUB_ENV"
 
-          echo "=================================================="
-          echo "SHA256:"
-          cat sha256.txt
-          echo "=================================================="
+            echo "=================================================="
+            echo "SHA256:"
+            cat sha256.txt
+            echo "=================================================="
 
-      - name: Upload file to API endpoint
-        env:
-          UPLOAD_URL: ${{ secrets.UPLOAD_URL }}
-          UPLOAD_API_KEY: ${{ secrets.UPLOAD_API_KEY }}
-        run: |
-          echo "=================================================="
-          echo "Uploading archive to API endpoint"
-          echo "=================================================="
+            echo "[$(date '+%H:%M:%S')] sha256......OK" >> "$RUNNER_TEMP/build.log"
+          else
+            echo "[$(date '+%H:%M:%S')] sha256......FAIL" >> "$RUNNER_TEMP/build.log"
+            exit 1
+          fi
 
-          RESPONSE="$(
-            curl --fail --show-error --silent \
-              -X POST "$UPLOAD_URL" \
-              -H "Authorization: Bearer $UPLOAD_API_KEY" \
-              -F "file=@$ARCHIVE_NAME" \
-              -F "category=ipk_mod_public" \
-              -F "subfolder=${{ matrix.arch }}" \
-              -F "repository=${{ github.repository }}" \
-              -F "sha256=${SHA256}" \
-              -F "notify_telegram=1" \
-              -F "pkg_name=passwall" \
-              -F "pkg_version=${PKG_VERSION}" \
-              -F "arch=${{ matrix.arch }}" \
-              -F "mod_name=MahaVPN" \
-              -F "caption_title=Passwall build automation"
-          )"
+  - name: Upload file to API endpoint
+    env:
+      UPLOAD_URL: ${{ secrets.UPLOAD_URL }}
+      UPLOAD_API_KEY: ${{ secrets.UPLOAD_API_KEY }}
+    run: |
+      echo "[$(date '+%H:%M:%S')] upload......OK" >> "$RUNNER_TEMP/build.log"
+      LOG_BODY="$(cat "$RUNNER_TEMP/build.log")"
 
-          python3 - <<'PY' "$RESPONSE"
-          import json, sys
-          data = json.loads(sys.argv[1])
-          print("==================================================")
-          print(f"success : {data.get('success')}")
-          print(f"message : {data.get('message')}")
-          if data.get("data"):
-              import json as _json
-              print("payload :")
-              print(_json.dumps(data["data"], indent=2))
-          print("==================================================")
-          PY
+      BUILD_END_EPOCH="$(date +%s)"
+      BUILD_DURATION_SEC="$((BUILD_END_EPOCH - BUILD_START_EPOCH))"
+      BUILD_DURATION_FMT="$(printf '%02d:%02d:%02d' \
+        $((BUILD_DURATION_SEC / 3600)) \
+        $(((BUILD_DURATION_SEC % 3600) / 60)) \
+        $((BUILD_DURATION_SEC % 60)))"
+
+      CAPTION="$(cat <<EOF
+      <b>Passwall build automation</b>
+      <b>Mod by:</b> MahaVPN
+
+      <b>● File:</b> $PKG_NAME
+      <b>● Version:</b> $PKG_VERSION
+      <b>● Arch:</b> ${{ matrix.arch }}
+      <b>● For Openwrt:</b> ${{ matrix.release_prefix }}
+
+      <b>● Archive:</b> <code>$(basename "$ARCHIVE_NAME")</code>
+
+      <b>Build log</b>
+      <pre>${LOG_BODY}</pre>
+
+      <b>Build finished in:</b> ${BUILD_DURATION_FMT}
+      EOF
+      )"
+
+      RESPONSE="$(
+        curl --fail --show-error --silent \
+          -X POST "$UPLOAD_URL" \
+          -H "Authorization: Bearer $UPLOAD_API_KEY" \
+          -F "file=@$ARCHIVE_NAME" \
+          -F "category=ipk_mod_public" \
+          -F "subfolder=${{ matrix.arch }}" \
+          -F "repository=${{ github.repository }}" \
+          -F "sha256=${SHA256}" \
+          -F "notify_telegram=1" \
+          -F "pkg_name=passwall" \
+          -F "pkg_version=${PKG_VERSION}" \
+          -F "arch=${{ matrix.arch }}" \
+          -F "mod_name=MahaVPN" \
+          --form-string "caption=$CAPTION"
+      )"
+
+      python3 - <<'PY' "$RESPONSE"
+      import json, sys
+      data = json.loads(sys.argv[1])
+      print("==================================================")
+      print(f"success : {data.get('success')}")
+      print(f"message : {data.get('message')}")
+      if data.get("data"):
+          import json as _json
+          print("payload :")
+          print(_json.dumps(data["data"], indent=2))
+      print("==================================================")
+      PY
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
@@ -347,6 +435,7 @@ jobs:
 
       - name: Done
         run: |
+          echo "[$(date '+%H:%M:%S')] success.....OK" >> "$RUNNER_TEMP/build.log"
           echo "=================================================="
           echo "Build and upload finished successfully"
           echo "=================================================="
