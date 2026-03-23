@@ -454,7 +454,7 @@ local function set_ss_implementation(result)
 		result.type = 'sing-box'
 		result.protocol = 'shadowsocks'
 	else
-		log("跳过 SS 节点，因未适配到 SS 核心程序，或未正确设置节点使用类型。")
+		log("The SS node is skipped because it is not adapted to the SS core program or the node usage type is not set correctly.")
 		return nil
 	end
 	return result
@@ -471,7 +471,7 @@ local function processData(szType, content, add_mode, group)
 	--ssr://base64(host:port:protocol:method:obfs:base64pass/?obfsparam=base64param&protoparam=base64param&remarks=base64remarks&group=base64group&udpport=0&uot=0)
 	if szType == 'ssr' then
 		if not has_ssr then
-			log("跳过 SSR 节点，因未安装 SSR 核心程序 shadowsocksr-libev。")
+			log("The SSR node is skipped because the SSR core program shadowsocksr-libev is not installed.")
 			return nil
 		end
 		result.type = "SSR"
@@ -505,7 +505,7 @@ local function processData(szType, content, add_mode, group)
 		elseif vmess_type_default == "xray" and has_xray then
 			result.type = "Xray"
 		else
-			log("跳过 VMess 节点，因未适配到 VMess 核心程序，或未正确设置节点使用类型。")
+			log("The VMess node is skipped because it is not adapted to the VMess core program or the node usage type is not set correctly.")
 			return nil
 		end
 		result.alter_id = info.aid
@@ -955,7 +955,7 @@ local function processData(szType, content, add_mode, group)
 			result.type = 'Xray'
 			result.protocol = 'trojan'
 		else
-			log("跳过 Trojan 节点，因未适配到 Trojan 核心程序，或未正确设置节点使用类型。")
+			log("The Trojan node is skipped because it is not adapted to the Trojan core program or the node usage type is not set correctly.")
 			return nil
 		end
 		
@@ -1123,7 +1123,7 @@ local function processData(szType, content, add_mode, group)
 		elseif vless_type_default == "xray" and has_xray then
 			result.type = "Xray"
 		else
-			log("跳过 VLESS 节点，因未适配到 VLESS 核心程序，或未正确设置节点使用类型。")
+			log("The VLESS node is skipped because it is not adapted to the VLESS core program or the node usage type is not set correctly.")
 			return nil
 		end
 		result.protocol = "vless"
@@ -1303,7 +1303,7 @@ local function processData(szType, content, add_mode, group)
 			result.type = 'sing-box'
 			result.protocol = "hysteria"
 		else
-			log("跳过 Hysteria 节点，因未安装 Hysteria 核心程序 Sing-box。")
+			log("The Hysteria node is skipped because the Hysteria core program Sing-box is not installed.")
 			return nil
 		end
 
@@ -1418,7 +1418,7 @@ local function processData(szType, content, add_mode, group)
 				result.hysteria2_obfs = params["obfs-password"] or params["obfs_password"]
 			end
 		else
-			log("跳过 Hysteria2 节点，因未适配到 Hysteria2 核心程序，或未正确设置节点使用类型。")
+			log("The Hysteria2 node is skipped because it is not adapted to the Hysteria2 core program or the node usage type is not set correctly.")
 			return nil
 		end
 	elseif szType == 'tuic' then
@@ -1426,7 +1426,7 @@ local function processData(szType, content, add_mode, group)
 			result.type = 'sing-box'
 			result.protocol = "tuic"
 		else
-			log("跳过 Tuic 节点，因未安装 Tuic 核心程序 Sing-box。")
+			log("Tuic node is skipped because Tuic core program Sing-box is not installed.")
 			return nil
 		end
 
@@ -1493,7 +1493,7 @@ local function processData(szType, content, add_mode, group)
 			result.type = 'sing-box'
 			result.protocol = "anytls"
 		else
-			log("跳过 AnyTLS 节点，因未安装 AnyTLS 核心程序 Sing-box 1.12。")
+			log("The AnyTLS node is skipped because the AnyTLS core program Sing-box 1.12 is not installed.")
 			return nil
 		end
 
@@ -1816,7 +1816,7 @@ end
 
 local function update_node(manual)
 	if next(nodeResult) == nil then
-		log("没有可用的节点信息更新。")
+		log("No node information updates available.")
 		return
 	end
 

@@ -9,6 +9,10 @@ on:
       - 'luci-app-passwall/**'
       - '.github/workflows/build-passwall.yml'
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,13 +22,14 @@ jobs:
         include:
           - arch: aarch64_generic
             sdk_target: armsr-armv8
+            sdk_path: armsr/armv8
             release_prefix: 23.05-24.10
-            sdk_url: https://downloads.openwrt.org/releases/24.10.5/targets/armsr/armv8/openwrt-sdk-24.10.5-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
-            sdk_archive: openwrt-sdk-24.10.5-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst
 
     env:
       PKG_NAME: passwall
       LUCI_PKG_NAME: luci-app-passwall
+      OPENWRT_SERIES: "24.10"
+      TZ: Asia/Jakarta
 
     steps:
       - name: Checkout passwall source
@@ -54,6 +59,7 @@ jobs:
           echo "Version     : $PKG_VERSION"
           echo "Target Arch : ${{ matrix.arch }}"
           echo "SDK Target  : ${{ matrix.sdk_target }}"
+          echo "OpenWrt Series : $OPENWRT_SERIES"
           echo "Archive     : passwall-${{ matrix.arch }}-$PKG_VERSION.tar.gz"
           echo "=================================================="
 
@@ -65,27 +71,113 @@ jobs:
             gettext git libncurses5-dev libssl-dev rsync unzip zlib1g-dev \
             file wget subversion swig time tar zstd python3 python3-pip python3-setuptools curl
 
-      - name: Cache SDK archive
+      - name: Resolve latest OpenWrt SDK
+        id: resolve_sdk
+        uses: Afqoro/Openwrt-Sdk-ResolverKu@main
+        with:
+          sdk_path: ${{ matrix.sdk_path }}
+          sdk_target: ${{ matrix.sdk_target }}
+          openwrt_series: ${{ env.OPENWRT_SERIES }}
+    
+      - name: Restore SDK cache
         uses: actions/cache@v4
         with:
-          path: ${{ matrix.sdk_archive }}
-          key: sdk-${{ matrix.sdk_target }}-${{ matrix.sdk_archive }}
+          path: ${{ steps.resolve_sdk.outputs.sdk_archive }}
+          key: ${{ steps.resolve_sdk.outputs.sdk_cache_key }}
 
       - name: Download OpenWrt SDK
         run: |
-          if [ ! -f "${{ matrix.sdk_archive }}" ]; then
-            wget -O "${{ matrix.sdk_archive }}" "${{ matrix.sdk_url }}"
+          SDK_ARCHIVE="${{ steps.resolve_sdk.outputs.sdk_archive }}"
+          SDK_URL="${{ steps.resolve_sdk.outputs.sdk_url }}"
+
+          if [ ! -f "$SDK_ARCHIVE" ]; then
+            wget -O "$SDK_ARCHIVE" "$SDK_URL"
           fi
 
           echo "=================================================="
           echo "Downloaded SDK archive:"
-          ls -lh "${{ matrix.sdk_archive }}"
+          ls -lh "$SDK_ARCHIVE"
           echo "=================================================="
 
+      - name: Delete stale SDK caches for same target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CURRENT_KEY: ${{ steps.resolve_sdk.outputs.sdk_cache_key }}
+          PREFIX: ${{ steps.resolve_sdk.outputs.sdk_cache_prefix }}
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          import urllib.request
+
+          repo = os.environ["REPO"]
+          token = os.environ["GH_TOKEN"]
+          current_key = os.environ["CURRENT_KEY"]
+          prefix = os.environ["PREFIX"]
+
+          owner, name = repo.split("/", 1)
+          base = f"https://api.github.com/repos/{owner}/{name}/actions/caches?per_page=100"
+
+          req = urllib.request.Request(
+              base,
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+          )
+
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  data = json.load(resp)
+          except Exception as e:
+              print(f"Cache list skipped: {e}")
+              sys.exit(0)
+
+          caches = data.get("actions_caches", [])
+          stale = [
+              c for c in caches
+              if c.get("key", "").startswith(prefix) and c.get("key") != current_key
+          ]
+
+          if not stale:
+              print("No stale SDK caches to delete.")
+              sys.exit(0)
+
+          for c in stale:
+              cache_id = c["id"]
+              key = c.get("key", "")
+              url = f"https://api.github.com/repos/{owner}/{name}/actions/caches/{cache_id}"
+              req = urllib.request.Request(
+                  url,
+                  method="DELETE",
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      status = getattr(resp, "status", None)
+                  print(f"Deleted stale cache: {key} (id={cache_id}, status={status})")
+              except Exception as e:
+                  print(f"Failed to delete cache {key} (id={cache_id}): {e}")
+          PY
+
+          echo "[$(date '+%H:%M:%S')] sdk cache...OK" >> "$RUNNER_TEMP/build.log"
+          
       - name: Extract OpenWrt SDK
         run: |
+          SDK_ARCHIVE="${{ steps.resolve_sdk.outputs.sdk_archive }}"
+
           find . -maxdepth 1 -type d -name 'openwrt-sdk-*' -exec rm -rf {} +
-          tar --use-compress-program=unzstd -xf "${{ matrix.sdk_archive }}"
+          tar --use-compress-program=unzstd -xf "$SDK_ARCHIVE"
           SDK_DIR=$(find . -maxdepth 1 -type d -name "openwrt-sdk-*" | head -n 1)
 
           if [ -z "$SDK_DIR" ]; then

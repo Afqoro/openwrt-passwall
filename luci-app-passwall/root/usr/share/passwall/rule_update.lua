@@ -348,7 +348,7 @@ local function non_file_check(file_path, header_content)
 	local remote_file_size = nil
 	local local_file_size = tonumber(fs.stat(file_path, "size") or 0)
 	if local_file_size == 0 then
-		log("下载文件为空或读取出错。")
+		log("The download file is empty or a reading error occurred.")
 		return true
 	end
 	if header_content and header_content ~= "" then
@@ -360,7 +360,7 @@ local function non_file_check(file_path, header_content)
 		end
 	end
 	if remote_file_size and remote_file_size ~= local_file_size then
-		log(string.format("校验出错：远程 %dB, 下载 %dB", remote_file_size, local_file_size))
+		log(string.format("Verification error: remote %dB, download %dB", remote_file_size, local_file_size))
 		return true
 	end
 	return false
@@ -369,7 +369,7 @@ end
 local function GeoToRule(rule_name, rule_type, out_path)
 	local bin = api.finded_com("geoview")
 	if not (bin and api.compare_versions(api.get_app_version("geoview"), ">=", "0.1.10")) then
-		log("[警告] Geoview 组件缺失或版本过低，规则生成流程已被跳过。")
+		log("[Warning] The Geoview component is missing or the version is too old, and the rule generation process has been skipped.")
 		return false
 	end
 	local geosite_path = asset_location .. "geosite.dat"
@@ -424,7 +424,7 @@ local function fetch_rule(rule_name, rule_type, url, exclude_domain, max_retries
 					break
 				end
 				os.remove(current_file)
-				log(string.format("%s 第%d条规则下载失败 (HTTP:%s)，正在进行第%d次尝试...", rule_name, k, tostring(http_code), i))
+				log(string.format("%s Rule %d failed to download (HTTP:%s), the %d attempt is in progress...", rule_name, k, tostring(http_code), i))
 			end
 		else
 			if not GeoToRule(rule_name, rule_type, current_file) then return 1 end
@@ -484,7 +484,7 @@ local function fetch_rule(rule_name, rule_type, url, exclude_domain, max_retries
 			end
 		else
 			sret = 0
-			log(string.format("%s 第%d条规则: %s 下载失败！", rule_name, k, v))
+			log(string.format("%s Rule %d: %s download failed!", rule_name, k, v))
 		end
 		os.remove(current_file)
 	end
@@ -516,7 +516,7 @@ local function fetch_rule(rule_name, rule_type, url, exclude_domain, max_retries
 			end
 			os.execute(string.format("mv -f %s %s", file_tmp, rule_final_path))
 			if not rollback then reboot = 1 end
-			log(string.format("%s 更新成功，总规则数 %d 条。", rule_name, #result_list))
+			log(string.format("%s was updated successfully, the total number of rules is %d.", rule_name, #result_list))
 		else
 			log(rule_name .. " 版本一致，无需更新。")
 			os.remove(file_tmp)
@@ -669,7 +669,7 @@ if geo2rule ~= "1" and gfwlist_update == "0" and chnroute_update == "0" and chnr
 	os.exit(0)
 end
 
-log("开始更新规则...")
+log("Start updating rules...")
 local function safe_call(func, err_msg)
 	xpcall(func, function(e)
 		log(e)
@@ -685,13 +685,13 @@ end
 
 if geo2rule == "1" then
 	if geoip_update == "1" and not rollback then
-		log("geoip 开始更新...")
+		log("geoip starts updating...")
 		safe_call(fetch_geoip, "更新geoip发生错误...")
 		remove_tmp_geofile("geoip")
 	end
 
 	if geosite_update == "1" and not rollback then
-		log("geosite 开始更新...")
+		log("geosite starts updating...")
 		safe_call(fetch_geosite, "更新geosite发生错误...")
 		remove_tmp_geofile("geosite")
 	end
@@ -705,7 +705,7 @@ if geo2rule == "1" then
 			safe_call(fetch_chnroute, "生成chnroute发生错误...")
 			safe_call(fetch_chnroute6, "生成chnroute6发生错误...")
 		else
-			log("geoip.dat 文件不存在,跳过规则生成。")
+			log("The geoip.dat file does not exist, and rule generation is skipped.")
 		end
 	end
 
@@ -714,7 +714,7 @@ if geo2rule == "1" then
 			safe_call(fetch_gfwlist, "生成gfwlist发生错误...")
 			safe_call(fetch_chnlist, "生成chnlist发生错误...")
 		else
-			log("geosite.dat 文件不存在,跳过规则生成。")
+			log("The geosite.dat file does not exist, skipping rule generation.")
 		end
 	end
 else
@@ -735,13 +735,13 @@ else
 	end
 
 	if geoip_update == "1" then
-		log("geoip 开始更新...")
+		log("geoip starts updating...")
 		safe_call(fetch_geoip, "更新geoip发生错误...")
 		remove_tmp_geofile("geoip")
 	end
 
 	if geosite_update == "1" then
-		log("geosite 开始更新...")
+		log("geosite starts updating...")
 		safe_call(fetch_geosite, "更新geosite发生错误...")
 		remove_tmp_geofile("geosite")
 	end
@@ -764,8 +764,8 @@ if reboot == 1 then
 		end
 	end
 
-	log("重启服务，应用新的规则。")
+	log("Restart the service and apply the new rules.")
 	uci:set(name, "@global[0]", "flush_set", "1")
 	api.uci_save(uci, name, true, true)
 end
-log("规则更新完毕...\n")
+log("Rules updated...\n")
