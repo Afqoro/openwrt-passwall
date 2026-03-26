@@ -25,6 +25,10 @@ jobs:
             sdk_path: armsr/armv8
             release_prefix: 23.05-24.10
 
+          - arch: x86_64
+            sdk_target: x86-64
+            sdk_path: x86/64
+            release_prefix: 23.05-24.10
     env:
       PKG_NAME: passwall
       LUCI_PKG_NAME: luci-app-passwall
