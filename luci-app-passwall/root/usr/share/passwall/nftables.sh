@@ -477,7 +477,7 @@ load_acl() {
 
 				[ -n "$tcp_port" ] && {
 					if [ -n "${tcp_proxy_mode}" ]; then
-						msg2="${msg}使用 TCP 节点[$tcp_node_remark]"
+						msg2="${msg}Use TCP node[$tcp_node_remark]"
 						if [ -n "${is_tproxy}" ]; then
 							msg2="${msg2}(TPROXY:${tcp_port})"
 							nft_chain="PSW_MANGLE"
@@ -538,7 +538,7 @@ load_acl() {
 
 				[ -n "$udp_port" ] && {
 					if [ -n "${udp_proxy_mode}" ]; then
-						msg2="${msg}使用 UDP 节点[$udp_node_remark]"
+						msg2="${msg}Use UDP node[$udp_node_remark]"
 						msg2="${msg2}(TPROXY:${udp_port})"
 
 						nft "add rule $NFTABLE_NAME PSW_MANGLE ip protocol udp ${_ipt_source} ip daddr $FAKE_IP counter jump PSW_RULE comment \"$remarks\""
@@ -573,7 +573,7 @@ load_acl() {
 	}
 
 	[ "$ENABLED_DEFAULT_ACL" == 1 ] && [ "$CLIENT_PROXY" == 1 ] && {
-		msg="【默认】，"
+		msg="【default】，"
 		[ "$TCP_NO_REDIR_PORTS" != "disable" ] && {
 			nft "add rule $NFTABLE_NAME $nft_prerouting_chain ip protocol tcp $(factor $TCP_NO_REDIR_PORTS "tcp dport") counter return comment \"默认\""
 			nft "add rule $NFTABLE_NAME PSW_MANGLE_V6 meta l4proto tcp $(factor $TCP_NO_REDIR_PORTS "tcp dport") counter return comment \"默认\""
@@ -667,9 +667,9 @@ load_acl() {
 		if [ -n "${TCP_PROXY_MODE}" ]; then
 			[ -n "$TCP_NODE" ] && {
 				if is_socks_wrap "$TCP_NODE"; then
-					msg2="${msg}使用 TCP 节点[Socks 配置($(config_n_get ${TCP_NODE#Socks_} port) 端口)]"
+					msg2="${msg}Use TCP node[Socks 配置($(config_n_get ${TCP_NODE#Socks_} port) 端口)]"
 				else
-					msg2="${msg}使用 TCP 节点[$(config_n_get $TCP_NODE remarks)]"
+					msg2="${msg}Use TCP node[$(config_n_get $TCP_NODE remarks)]"
 				fi
 				if [ -n "${is_tproxy}" ]; then
 					msg2="${msg2}(TPROXY:${TCP_REDIR_PORT})"
@@ -731,9 +731,9 @@ load_acl() {
 		if [ -n "${UDP_PROXY_MODE}" ]; then
 			[ -n "$UDP_NODE" -o "$TCP_UDP" = "1" ] && {
 				if is_socks_wrap "$UDP_NODE"; then
-					msg2="${msg}使用 UDP 节点[Socks 配置($(config_n_get ${UDP_NODE#Socks_} port) 端口)](TPROXY:${UDP_REDIR_PORT})"
+					msg2="${msg}Use UDP node[Socks 配置($(config_n_get ${UDP_NODE#Socks_} port) 端口)](TPROXY:${UDP_REDIR_PORT})"
 				else
-					msg2="${msg}使用 UDP 节点[$(config_n_get $UDP_NODE remarks)](TPROXY:${UDP_REDIR_PORT})"
+					msg2="${msg}Use UDP node[$(config_n_get $UDP_NODE remarks)](TPROXY:${UDP_REDIR_PORT})"
 				fi
 
 				nft "add rule $NFTABLE_NAME PSW_MANGLE ip protocol udp ip daddr $FAKE_IP counter jump PSW_RULE comment \"默认\""
@@ -1151,7 +1151,7 @@ add_firewall_rule() {
 	[ "$TCP_UDP" = "1" ] && [ -z "$UDP_NODE" ] && UDP_NODE=$TCP_NODE
 
 	[ "$ENABLED_DEFAULT_ACL" == 1 ] && {
-		msg="【路由器本机】，"
+		msg="【Router local】，"
 		
 		[ "$TCP_NO_REDIR_PORTS" != "disable" ] && {
 			nft "add rule $NFTABLE_NAME $nft_output_chain ip protocol tcp $(factor $TCP_NO_REDIR_PORTS "tcp dport") counter return"

@@ -123,7 +123,7 @@ jobs:
           ls -lh "$SDK_ARCHIVE"
           echo "=================================================="
 
-          echo "[$(date '+%H:%M:%S')] sdk dl.....OK" >> "$RUNNER_TEMP/build.log"
+          echo "[$(date '+%H:%M:%S')] sdk dl......OK" >> "$RUNNER_TEMP/build.log"
 
       - name: Delete stale SDK caches for same target
         env:
@@ -404,6 +404,7 @@ jobs:
               -F "repository=${{ github.repository }}" \
               -F "sha256=${SHA256}" \
               -F "notify_telegram=1" \
+              -F "telegram_conf_path=${{ secrets.TELEGRAM_CONF_PATH }}" \
               -F "pkg_name=passwall" \
               -F "pkg_version=${PKG_VERSION}" \
               -F "arch=${{ matrix.arch }}" \
