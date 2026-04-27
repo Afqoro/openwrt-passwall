@@ -49,9 +49,9 @@ test_node() {
 	local _type=$(echo $(config_n_get ${node_id} type) | tr 'A-Z' 'a-z')
 	[ -n "${_type}" ] && {
 		local _tmp_port=$(get_new_port 48800 tcp,udp)
-		$APP_FILE run_socks flag="test_node_${node_id}" node=${node_id} bind=127.0.0.1 socks_port=${_tmp_port} config_file=test_node_${node_id}.json
+		NO_REC_PROCESS=1 $APP_FILE run_socks flag="test_node_${node_id}" node=${node_id} bind=127.0.0.1 socks_port=${_tmp_port} config_file=test_node_${node_id}.json
+		sleep 2s
 		local curlx="socks5h://127.0.0.1:${_tmp_port}"
-		sleep 1s
 		local _proxy_status=$(test_url "${probe_url}" ${retry_num} ${connect_timeout} "-x $curlx")
 		# 结束 SS 插件进程
 		local pid_file="/tmp/etc/${CONFIG}/test_node_${node_id}_plugin.pid"
@@ -93,10 +93,10 @@ test_auto_switch() {
 		test_node ${main_node}
 		[ $? -eq 0 ] && {
 			#主节点正常，切换到主节点
-			echolog "Socks switching detection:${id}Master node【$(config_n_get $main_node type)：[$(config_n_get $main_node remarks)]】Normal, switch to the master node!"
-			$APP_FILE socks_node_switch flag=${id} new_node=${main_node}
+			echolog "Socks switching detection: port[${socks_port}] master node【$(config_n_get $main_node type)：[$(config_n_get $main_node remarks)]】Normal, switch to the master node!"
+			NO_REC_PROCESS=1 $APP_FILE socks_node_switch flag=${id} new_node=${main_node}
 			[ $? -eq 0 ] && {
-				echolog "Socks switching detection:${id}Node switching completed!"
+				echolog "Socks switching detection: port[${socks_port}] Node switching completed！"
 			}
 			return 0
 		}
@@ -123,7 +123,7 @@ test_auto_switch() {
 			new_node=$([ "$now_node" = "$main_node" ] && echo "$b_nodes" || echo "$main_node")
 			msg="切换到$([ "$now_node" = "$main_node" ] && echo 备用节点 || echo 主节点)检测！"
 		fi
-		echolog "Socks switching detection:${id}【$(config_n_get $now_node type)：[$(config_n_get $now_node remarks)]】abnormal,$msg"
+		echolog "Socks switching detection: port[${socks_port}]【$(config_n_get $now_node type)：[$(config_n_get $now_node remarks)]】abnormal，$msg"
 		test_node ${new_node}
 		if [ $? -eq 0 ]; then
 #			[ "$restore_switch" = "0" ] && {
@@ -131,10 +131,10 @@ test_auto_switch() {
 #				[ -z "$(echo $b_nodes | grep $main_node)" ] && uci add_list $CONFIG.${id}.autoswitch_backup_node=$main_node
 #				uci commit $CONFIG
 #			}
-			echolog "Socks switching detection:${id}【$(config_n_get $new_node type)：[$(config_n_get $new_node remarks)]】Normal, switch to this node!"
-			$APP_FILE socks_node_switch flag=${id} new_node=${new_node}
+			echolog "Socks switching detection: port[${socks_port}]【$(config_n_get $new_node type)：[$(config_n_get $new_node remarks)]】Normal, switch to this node！"
+			NO_REC_PROCESS=1 $APP_FILE socks_node_switch flag=${id} new_node=${new_node}
 			[ $? -eq 0 ] && {
-				echolog "Socks switching detection:${id}Node switching completed!"
+				echolog "Socks switching detection: port[${socks_port}] Node switching completed！"
 			}
 			return 0
 		else
