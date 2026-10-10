@@ -122,8 +122,8 @@ for i = 1, 6 do
 	table.insert(config_lines, "#--" .. i)
 end
 
---自定义规则组，后声明的组具有更高优先级
---屏蔽列表
+--Custom rule group, later declared has higher priority
+--Block list
 local file_block_host = CACHE_RULES_PATH .. "/block_host"
 if not fs.access(file_block_host .. "_ok") then
 	api.remove(file_block_host .. "*")
@@ -167,7 +167,7 @@ if USE_BLOCK_LIST == "1" and not fs.access(file_block_host) then
 end
 if USE_BLOCK_LIST == "1" and is_file_nonzero(file_block_host) then
 	if block_geosite_flag then
-		log("  - [屏蔽列表] Geosite 使用缓存结果，跳过重复解析")
+		log("  - [Block list] Geosite using cached result, skip duplicate resolve")
 	end
 	tmp_lines = {
 		"group null",
@@ -176,7 +176,7 @@ if USE_BLOCK_LIST == "1" and is_file_nonzero(file_block_host) then
 	insert_array_after(config_lines, tmp_lines, "#--5")
 end
 
---始终用国内DNS解析节点域名
+--Always use local DNS to resolve node domain
 local file_vpslist = TMP_PATH .. "/vpslist"
 if not is_file_nonzero(file_vpslist) then
 	local f_out = io.open(file_vpslist, "w")
@@ -211,10 +211,10 @@ if is_file_nonzero(file_vpslist) then
 		"group-ipset " .. table.concat(sets, ",")
 	}
 	insert_array_after(config_lines, tmp_lines, "#--6")
-	log(string.format("  - Domain name in the node list (vpslist): %s", DNS_LOCAL or "默认"))
+	log(string.format("  - Domain name in the node list (vpslist): %s", DNS_LOCAL or "default"))
 end
 
---直连（白名单）列表
+--Direct (Whitelist)
 local file_direct_host = CACHE_RULES_PATH .. "/direct_host"
 if not fs.access(file_direct_host .. "_ok") then
 	api.remove(file_direct_host .. "*")
@@ -258,7 +258,7 @@ if USE_DIRECT_LIST == "1" and not fs.access(file_direct_host) then
 end
 if USE_DIRECT_LIST == "1" and is_file_nonzero(file_direct_host) then
 	if direct_geosite_flag then
-		log("  - [直连列表] Geosite 使用缓存结果，跳过重复解析")
+		log("  - [Direct list] Geosite using cached result, skip duplicate resolve")
 	end
 	local sets = {
 		setflag .. "psw_white",
@@ -271,10 +271,10 @@ if USE_DIRECT_LIST == "1" and is_file_nonzero(file_direct_host) then
 		"group-ipset " .. table.concat(sets, ",")
 	}
 	insert_array_after(config_lines, tmp_lines, "#--4")
-	log(string.format("  - Domain name whitelist (whitelist): %s", DNS_LOCAL or "默认"))
+	log(string.format("  - Domain name whitelist (whitelist): %s", DNS_LOCAL or "default"))
 end
 
---代理（黑名单）列表
+--Proxy (Blacklist)
 local file_proxy_host = CACHE_RULES_PATH .. "/proxy_host"
 if not fs.access(file_proxy_host .. "_ok") then
 	api.remove(file_proxy_host .. "*")
@@ -318,7 +318,7 @@ if USE_PROXY_LIST == "1" and not fs.access(file_proxy_host) then
 end
 if USE_PROXY_LIST == "1" and is_file_nonzero(file_proxy_host) then
 	if proxy_geosite_flag then
-		log("  - [代理列表] Geosite 使用缓存结果，跳过重复解析")
+		log("  - [Proxy list] Geosite using cached result, skip duplicate resolve")
 	end
 	local sets = {
 		setflag .. "psw_black",
@@ -338,11 +338,11 @@ if USE_PROXY_LIST == "1" and is_file_nonzero(file_proxy_host) then
 	}
 	if NO_IPV6_TRUST == "1" then table.insert(tmp_lines, "no-ipv6 tag:proxylist") end
 	insert_array_after(config_lines, tmp_lines, "#--3")
-	log(string.format("  - Proxy domain name list (blacklist): %s", DNS_TRUST or "默认"))
+	log(string.format("  - Proxy domain name list (blacklist): %s", DNS_TRUST or "default"))
 end
 
---内置组(chn/gfw)优先级在自定义组后
---GFW列表
+--Builtin group (chn/gfw) priority after custom group
+--GFW List
 if GFWLIST == "1" and is_file_nonzero(RULES_PATH .. "/gfwlist") then
 	local sets = {
 		setflag .. "psw_gfw",
@@ -360,10 +360,10 @@ if GFWLIST == "1" and is_file_nonzero(RULES_PATH .. "/gfwlist") then
 	}
 	if NO_IPV6_TRUST == "1" then table.insert(tmp_lines, "no-ipv6 tag:gfw") end
 	merge_array(config_lines, tmp_lines)
-	log(string.format("  - Firewall domain name list (gfwlist): %s", DNS_TRUST or "默认"))
+	log(string.format("  - Firewall domain name list (gfwlist): %s", DNS_TRUST or "default"))
 end
 
---中国列表
+--China list
 if CHNLIST ~= "0" and is_file_nonzero(RULES_PATH .. "/chnlist") then
 	if CHNLIST == "direct" then
 		local sets = {
@@ -378,10 +378,10 @@ if CHNLIST ~= "0" and is_file_nonzero(RULES_PATH .. "/chnlist") then
 			"add-tagchn-ip" .. ((NFTFLAG == "1") and (" " .. table.concat(sets, ",")) or "")
 		}
 		merge_array(config_lines, tmp_lines)
-		log(string.format("  - China domain name table (chnroute): %s", DNS_LOCAL or "默认"))
+		log(string.format("  - China domain name table (chnroute): %s", DNS_LOCAL or "default"))
 	end
 
-	--回中国模式
+	--Return to China mode
 	if CHNLIST == "proxy" then
 		local sets = {
 			setflag .. "psw_chn",
@@ -395,11 +395,11 @@ if CHNLIST ~= "0" and is_file_nonzero(RULES_PATH .. "/chnlist") then
 		}
 		if NO_IPV6_TRUST == "1" then table.insert(tmp_lines, "no-ipv6 tag:chn_proxy") end
 		insert_array_after(config_lines, tmp_lines, "#--1")
-		log(string.format("  - China domain name table (chnroute): %s", DNS_TRUST or "默认"))
+		log(string.format("  - China domain name table (chnroute): %s", DNS_TRUST or "default"))
 	end
 end
 
---分流规则
+--Shunt rules
 if IS_SHUNT_NODE and not only_global then
 	local direct_domain, lookup_direct_domain = {}, {}
 	local proxy_domain, lookup_proxy_domain = {}, {}
@@ -452,7 +452,7 @@ if IS_SHUNT_NODE and not only_global then
 			end
 
 			if _node_id ~= "_direct" then
-				log(string.format("  - Sing-Box/Xray diversion rule (%s): %s", s.remarks, DNS_TRUST or "默认"))
+				log(string.format("  - Sing-Box/Xray diversion rule (%s): %s", s.remarks, DNS_TRUST or "default"))
 			end
 		end
 	end)
@@ -508,7 +508,7 @@ if IS_SHUNT_NODE and not only_global then
 			local code, out = get_geosite(arg, dest)
 			if code ~= 0 then
 				ok = false
-				log("  - 解析[分流节点] Geosite 失败！[" .. out .. "]")
+				log("  - Resolve [shunt node] Geosite failed! [" .. out .. "]")
 			end
 		end
 		if (return_white == nil or return_white == 0) and (return_shunt == nil or return_shunt == 0) then
@@ -519,7 +519,7 @@ if IS_SHUNT_NODE and not only_global then
 	end
 
 	if USE_CACHE and USE_GEOVIEW == "1" and (geosite_direct_arg ~= "" or geosite_proxy_arg ~= "" or geosite_black_arg ~= "") then
-		log("  - [分流节点] Geosite 使用缓存结果，跳过重复解析")
+		log("  - [shunt node] Geosite using cached result, skip duplicate resolve")
 	end
 
 	-- 与 chnlist 比对
@@ -585,13 +585,13 @@ if IS_SHUNT_NODE and not only_global then
 	end
 end
 
---只使用gfwlist模式，GFW列表以外的域名及默认使用本地DNS
+--只使用gfwlist模式，GFW List以外的域名及default使用本地DNS
 if GFWLIST == "1" and CHNLIST == "0" then DEFAULT_TAG = "chn" end
 
---回中国模式，中国列表以外的域名及默认使用本地DNS
+--Return to China mode，China list以外的域名及default使用本地DNS
 if CHNLIST == "proxy" then DEFAULT_TAG = "chn" end
 
---全局模式，默认使用远程DNS
+--Global mode: default to remote DNS
 if only_global then
 	DEFAULT_TAG = "gfw"
 	if NO_IPV6_TRUST == "1" and not IS_SHUNT_NODE then 
@@ -617,10 +617,10 @@ if DEFAULT_TAG == "chn" then
 elseif  DEFAULT_TAG == "gfw" then
 	log(string.format("  -Default DNS: %s", DNS_TRUST))
 else
-	log(string.format("  -Default DNS: %s", "智能匹配"))
+	log(string.format("  -Default DNS: %s", "Smart Match"))
 end
 
---输出配置文件
+--Output config file
 if #config_lines > 0 then
 	for i = 1, #config_lines do
 		line = config_lines[i]

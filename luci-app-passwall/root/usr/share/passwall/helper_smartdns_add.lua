@@ -116,7 +116,7 @@ if LOCAL_GROUP == "null" or LOCAL_GROUP == "" then
 	log("  * Note: If the SmartDNS domestic group name is not set, DNS will not work properly! ! !")
 	os.exit(1)
 else
-	--从smartdns配置中读取参数
+	--Read params from smartdns config
 	local custom_conf_path = "/etc/smartdns/custom.conf"
 	local options = {
 		{key = "dualstack_ip_selection", config_key = "dualstack-ip-selection", yes_no = true, arg_yes = "-d yes", arg_no = "-d no", default = "yes"},
@@ -255,10 +255,10 @@ else
 	log("  - " .. DNS_MODE:gsub("^%l",string.upper) .. " " .. TUN_DNS .. " -> " .. REMOTE_GROUP)
 end
 
---设置默认 DNS 分组(托底组)
+--设置default DNS 分组(托底组)
 local DEFAULT_DNS_GROUP = (USE_DEFAULT_DNS == "direct" and LOCAL_GROUP) or
                           (USE_DEFAULT_DNS == "remote" and REMOTE_GROUP)
-local only_global = (DEFAULT_PROXY_MODE == "proxy" and CHN_LIST == "0" and USE_GFW_LIST == "0") and 1 --没有启用中国列表和GFW列表时(全局)
+local only_global = (DEFAULT_PROXY_MODE == "proxy" and CHN_LIST == "0" and USE_GFW_LIST == "0") and 1 --没有EnabledChina list和GFW List时(全局)
 if only_global == 1 then
 	DEFAULT_DNS_GROUP = REMOTE_GROUP
 end
@@ -276,12 +276,12 @@ end
 local setflag = (NFTFLAG == "1") and "inet#passwall#" or ""
 local set_type = (NFTFLAG == "1") and "-nftset" or "-ipset"
 
---预设排序标签(越往后优先级越高)
+--Preset priority tags
 for i = 1, 10 do
 	table.insert(config_lines, "#--" .. i)
 end
 
---屏蔽列表
+--Block list
 local file_block_host = CACHE_RULES_PATH .. "/block_host"
 if not fs.access(file_block_host .. "_ok") then
 	api.remove(file_block_host .. "*")
@@ -325,7 +325,7 @@ if USE_BLOCK_LIST == "1" and not fs.access(file_block_host) then
 end
 if USE_BLOCK_LIST == "1" and is_file_nonzero(file_block_host) then
 	if block_geosite_flag then
-		log("  - [屏蔽列表] Geosite 使用缓存结果，跳过重复解析")
+		log("  - [Block list] Geosite using cached result, skip duplicate resolve")
 	end
 	local domain_set_name = "psw-block"
 	tmp_lines = {
@@ -335,7 +335,7 @@ if USE_BLOCK_LIST == "1" and is_file_nonzero(file_block_host) then
 	insert_array_after(config_lines, tmp_lines, "#--8")
 end
 
---始终用国内DNS解析节点域名
+--Always use local DNS to resolve node domain
 local file_vpslist = TMP_PATH .. "/vpslist"
 if not is_file_nonzero(file_vpslist) then
 	local f_out = io.open(file_vpslist, "w")
@@ -372,10 +372,10 @@ if is_file_nonzero(file_vpslist) then
 	domain_rules_str = domain_rules_str .. (LOCAL_EXTEND_ARG ~= "" and " " .. LOCAL_EXTEND_ARG or "")
 	table.insert(tmp_lines, domain_rules_str)
 	insert_array_after(config_lines, tmp_lines, "#--8")
-	log(string.format("  - The domain name in the node list (vpslist) uses grouping: %s", LOCAL_GROUP or "默认"))
+	log(string.format("  - The domain name in the node list (vpslist) uses grouping: %s", LOCAL_GROUP or "default"))
 end
 
---直连（白名单）列表
+--Direct (Whitelist)
 local file_direct_host = CACHE_RULES_PATH .. "/direct_host"
 if not fs.access(file_direct_host .. "_ok") then
 	api.remove(file_direct_host .. "*")
@@ -419,7 +419,7 @@ if USE_DIRECT_LIST == "1" and not fs.access(file_direct_host) then
 end
 if USE_DIRECT_LIST == "1" and is_file_nonzero(file_direct_host) then
 	if direct_geosite_flag then
-		log("  - [直连列表] Geosite 使用缓存结果，跳过重复解析")
+		log("  - [Direct list] Geosite using cached result, skip duplicate resolve")
 	end
 	local domain_set_name = "psw-directlist"
 	tmp_lines = {
@@ -434,10 +434,10 @@ if USE_DIRECT_LIST == "1" and is_file_nonzero(file_direct_host) then
 	domain_rules_str = domain_rules_str .. (LOCAL_EXTEND_ARG ~= "" and " " .. LOCAL_EXTEND_ARG or "")
 	table.insert(tmp_lines, domain_rules_str)
 	insert_array_after(config_lines, tmp_lines, "#--6")
-	log(string.format("  - Domain name whitelist (whitelist) usage group: %s", LOCAL_GROUP or "默认"))
+	log(string.format("  - Domain name whitelist (whitelist) usage group: %s", LOCAL_GROUP or "default"))
 end
 
---代理（黑名单）列表
+--Proxy (Blacklist)
 local file_proxy_host = CACHE_RULES_PATH .. "/proxy_host"
 if not fs.access(file_proxy_host .. "_ok") then
 	api.remove(file_proxy_host .. "*")
@@ -481,7 +481,7 @@ if USE_PROXY_LIST == "1" and not fs.access(file_proxy_host) then
 end
 if USE_PROXY_LIST == "1" and is_file_nonzero(file_proxy_host) then
 	if proxy_geosite_flag then
-		log("  - [代理列表] Geosite 使用缓存结果，跳过重复解析")
+		log("  - [Proxy list] Geosite using cached result, skip duplicate resolve")
 	end
 	local domain_set_name = "psw-proxylist"
 	tmp_lines = {
@@ -501,10 +501,10 @@ if USE_PROXY_LIST == "1" and is_file_nonzero(file_proxy_host) then
 	end
 	table.insert(tmp_lines, domain_rules_str)
 	insert_array_after(config_lines, tmp_lines, "#--5")
-	log(string.format("  - Proxy domain name list (blacklist) usage group: %s", REMOTE_GROUP or "默认"))
+	log(string.format("  - Proxy domain name list (blacklist) usage group: %s", REMOTE_GROUP or "default"))
 end
 
---GFW列表
+--GFW List
 if USE_GFW_LIST == "1" and is_file_nonzero(RULES_PATH .. "/gfwlist") then
 	local domain_set_name = "psw-gfwlist"
 	tmp_lines = {
@@ -524,10 +524,10 @@ if USE_GFW_LIST == "1" and is_file_nonzero(RULES_PATH .. "/gfwlist") then
 	end
 	table.insert(tmp_lines, domain_rules_str)
 	insert_array_after(config_lines, tmp_lines, "#--1")
-	log(string.format("  - Firewall domain name table (gfwlist) uses group: %s", REMOTE_GROUP or "默认"))
+	log(string.format("  - Firewall domain name table (gfwlist) uses group: %s", REMOTE_GROUP or "default"))
 end
 
---中国列表
+--China list
 if CHN_LIST ~= "0" and is_file_nonzero(RULES_PATH .. "/chnlist") then
 	local domain_set_name = "psw-chnlist"
 	tmp_lines = {
@@ -544,10 +544,10 @@ if CHN_LIST ~= "0" and is_file_nonzero(RULES_PATH .. "/chnlist") then
 		domain_rules_str = domain_rules_str .. (LOCAL_EXTEND_ARG ~= "" and " " .. LOCAL_EXTEND_ARG or "")
 		table.insert(tmp_lines, domain_rules_str)
 		insert_array_after(config_lines, tmp_lines, "#--2")
-		log(string.format("  - China domain name table (chnroute) uses grouping: %s", LOCAL_GROUP or "默认"))
+		log(string.format("  - China domain name table (chnroute) uses grouping: %s", LOCAL_GROUP or "default"))
 	end
 
-	--回中国模式
+	--Return to China mode
 	if CHN_LIST == "proxy" then
 		local domain_rules_str = string.format('domain-rules /domain-set:%s/ -nameserver %s', domain_set_name, REMOTE_GROUP)
 		domain_rules_str = domain_rules_str .. " -speed-check-mode none"
@@ -563,11 +563,11 @@ if CHN_LIST ~= "0" and is_file_nonzero(RULES_PATH .. "/chnlist") then
 		end
 		table.insert(tmp_lines, domain_rules_str)
 		insert_array_after(config_lines, tmp_lines, "#--2")
-		log(string.format("  - China domain name table (chnroute) uses grouping: %s", REMOTE_GROUP or "默认"))
+		log(string.format("  - China domain name table (chnroute) uses grouping: %s", REMOTE_GROUP or "default"))
 	end
 end
 
---分流规则
+--Shunt rules
 if IS_SHUNT_NODE and not only_global then
 	local direct_domain, lookup_direct_domain = {}, {}
 	local proxy_domain, lookup_proxy_domain = {}, {}
@@ -619,7 +619,7 @@ if IS_SHUNT_NODE and not only_global then
 			end
 
 			if _node_id ~= "_direct" then
-				log(string.format("  - Sing-Box/Xray diversion rule (%s) uses grouping: %s", s.remarks, REMOTE_GROUP or "默认"))
+				log(string.format("  - Sing-Box/Xray diversion rule (%s) uses grouping: %s", s.remarks, REMOTE_GROUP or "default"))
 			end
 		end
 	end)
@@ -675,7 +675,7 @@ if IS_SHUNT_NODE and not only_global then
 			local code, out = get_geosite(arg, dest)
 			if code ~= 0 then
 				ok = false
-				log("  - 解析[分流节点] Geosite 失败！[" .. out .. "]")
+				log("  - Resolve [shunt node] Geosite failed! [" .. out .. "]")
 			end
 		end
 		if (return_white == nil or return_white == 0) and (return_shunt == nil or return_shunt == 0) then
@@ -686,7 +686,7 @@ if IS_SHUNT_NODE and not only_global then
 	end
 
 	if USE_CACHE and USE_GEOVIEW == "1" and (geosite_direct_arg ~= "" or geosite_proxy_arg ~= "" or geosite_black_arg ~= "") then
-		log("  - [分流节点] Geosite 使用缓存结果，跳过重复解析")
+		log("  - [shunt node] Geosite using cached result, skip duplicate resolve")
 	end
 
 	if is_file_nonzero(shunt_direct_host) then

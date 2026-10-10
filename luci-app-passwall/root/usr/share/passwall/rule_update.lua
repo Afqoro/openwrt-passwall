@@ -11,20 +11,20 @@ local uci, uci_get, uci_set, uci_del, uci_foreach, uci_save = api.uci, api.uci_g
 -- Both update scripts use the same lockf lock; the kernel releases it on exit.
 local update_lock = api.nixio.open(api.LOCK_PREFIX .. "_sub_rule.lock", api.nixio.open_flags("rdwr", "creat"))
 if not update_lock then
-	api.log("无法打开订阅/规则更新锁，退出。")
+	api.log("Cannot open sub/rule-update lock, exiting.")
 	os.exit(1)
 end
 -- Scheduled updates wait for the lock; manual requests may skip a busy lock.
 if not update_lock:lock("tlock") then
 	if arg[3] ~= "cron" then
-		api.log("订阅或规则更新正在运行，本次请求跳过。")
+		api.log("Sub or rule-update is running, request skipped.")
 		os.exit(0)
 	end
-	local running = ({s = "订阅", r = "规则更新"})[update_lock:read(1)] or "订阅/规则更新"
+	local running = ({s = "订阅", r = "Rule update"})[update_lock:read(1)] or "订阅/Rule update"
 	update_lock:seek(0)
-	api.log("[" .. running .. "]实例正在运行，[规则更新]进入队列等待...")
+	api.log("[" .. running .. "]instance is running, rule-update queued...")
 	if not update_lock:lock("lock") then
-		api.log("无法取得更新锁，计划任务失败。")
+		api.log("Cannot acquire update lock, cron failed.")
 		os.exit(1)
 	end
 end
@@ -285,7 +285,7 @@ local function is_ipv6(s, check_cidr)
 				if mask > 128 then return false end
 				i = i + 1
 			end
-			-- CIDR 解析成功
+			-- CIDR 解析Success
 			return true
 		end
 		-- 冒号处理（: 或 ::）
@@ -422,7 +422,7 @@ local function GeoToRule(rule_name, rule_type, out_path)
 	local local_file_size = tonumber(fs.stat(out_path, "size") or 0)
 	if local_file_size == 0 then
 		api.remove(out_path)
-		log(rule_name .. " 生成失败，请确保 Geo 文件正确且包含目标规则。")
+		log(rule_name .. " generation failed, ensure Geo file contains rules.")
 		return false
 	end
 	return true
@@ -437,9 +437,9 @@ local function fetch_rule(rule_name, rule_type, url, exclude_domain, max_retries
 	local rule_final_path = rule_path .. "/" .. rule_name
 	if geo2rule == "1" then
 		url = {"geo2rule"}
-		log(rule_name.. " 开始生成...")
+		log(rule_name.. " generation started...")
 	else
-		log(rule_name.. " 开始更新...")
+		log(rule_name.. " Start updating...")
 	end
 
 	for k, v in ipairs(url) do
@@ -548,11 +548,11 @@ local function fetch_rule(rule_name, rule_type, url, exclude_domain, max_retries
 			if not rollback then reboot = 1 end
 			log(string.format("%s was updated successfully, the total number of rules is %d.", rule_name, #result_list))
 		else
-			log(rule_name .. " 版本一致，无需更新。")
+			log(rule_name .. " version identical, update not needed.")
 			api.remove(file_tmp)
 		end
 	else
-		log(rule_name .. " 更新失败（部分或全部资源无法下载）。")
+		log(rule_name .. " Update failed (some or all resources failed to download).")
 		api.remove(file_tmp)
 	end
 	return 0
@@ -587,7 +587,7 @@ local function fetch_geofile(geo_name, geo_type, url)
 		if fs.access(asset_path) then
 			sys.call(string.format("cp -f %s %s", asset_path, tmp_path))
 			if verify_sha256(sha_path) then
-				log(geo_type .. " 版本一致，无需更新。")
+				log(geo_type .. " version identical, update not needed.")
 				return 0
 			end
 		end
@@ -595,12 +595,12 @@ local function fetch_geofile(geo_name, geo_type, url)
 
 	local sret_tmp, _, header = curl(url, tmp_path)
 	if sret_tmp == 0 and non_file_check(tmp_path, header) then
-		log(geo_type .. " 下载文件过程出错，尝试重新下载。")
+		log(geo_type .. " download error, retrying...")
 		api.remove(tmp_path)
 		sret_tmp, _, header= curl(url, tmp_path)
 		if sret_tmp == 0 and non_file_check(tmp_path, header) then
 			sret_tmp = 1
-			log(geo_type .. " 下载文件过程出错，请检查网络或下载链接后重试！")
+			log(geo_type .. " download error, please check network or URL!")
 		end
 	end
 	if sret_tmp == 0 then
@@ -609,25 +609,25 @@ local function fetch_geofile(geo_name, geo_type, url)
 				sys.call(string.format("mkdir -p %s && mv -f %s %s", backup_path, asset_path, backup_path))
 				sys.call(string.format("mkdir -p %s && mv -f %s %s", asset_location, tmp_path, asset_path))
 				reboot = 1
-				log(geo_type .. " 更新成功。")
+				log(geo_type .. " Update successful。")
 				if geo_type == "geoip" then
 					geoip_update_ok = true
 				else
 					geosite_update_ok = true
 				end
 			else
-				log(geo_type .. " 更新失败，请稍后重试或更换更新URL。")
+				log(geo_type .. " Update failed, please try again or change update URL.")
 				return 1
 			end
 		else
 			if fs.access(asset_path) and sys.call(string.format("cmp -s %s %s", tmp_path, asset_path)) == 0 then
-				log(geo_type .. " 版本一致，无需更新。")
+				log(geo_type .. " version identical, update not needed.")
 				return 0
 			end
 			sys.call(string.format("mkdir -p %s && mv -f %s %s", backup_path, asset_path, backup_path))
 			sys.call(string.format("mkdir -p %s && mv -f %s %s", asset_location, tmp_path, asset_path))
 			reboot = 1
-			log(geo_type .. " 更新成功。")
+			log(geo_type .. " Update successful。")
 			if geo_type == "geoip" then
 				geoip_update_ok = true
 			else
@@ -635,7 +635,7 @@ local function fetch_geofile(geo_name, geo_type, url)
 			end
 		end
 	else
-		log(geo_type .. " 更新失败，请稍后重试或更换更新URL。")
+		log(geo_type .. " Update failed, please try again or change update URL.")
 		return 1
 	end
 	return 0

@@ -18,7 +18,7 @@ local function host_format(host)
 	return host
 end
 
-local function build_alpn(alpn)   -- 排序+去重
+local function build_alpn(alpn)   -- Sort + Dedup
 	if not alpn then return nil end
 
 	local seen = {}
@@ -328,7 +328,7 @@ local function encode_ss(node)
 		["aes-128-ctr"]=1, ["aes-192-ctr"]=1, ["aes-256-ctr"]=1, ["aes-128-cfb"]=1, ["aes-192-cfb"]=1, ["aes-256-cfb"]=1, ["rc4-md5"]=1, ["chacha20-ietf"]=1, ["xchacha20"]=1,
 	}
 	if not ss_method[node.cipher or ""] then
-		return 1, "订阅转换 → 丢弃 SS 节点：" .. (node.name or "") .. "，因 Core 不支持 " .. (node.cipher or "") .. " 加密方式"
+		return 1, "Sub-convert -> Drop SS node: " .. (node.name or "") .. "，Core does not support " .. (node.cipher or "") .. " cipher"
 	end
 
 	local userinfo = node.cipher .. ":" .. node.password
@@ -371,7 +371,7 @@ local function encode_ss(node)
 			if #opts > 0 then plugin = plugin .. ";" .. table.concat(opts, ";") end
 			table.insert(p, "plugin=" .. urlencode(plugin))
 		else
-			return 1, "订阅转换 → 丢弃 SS 节点：" .. (node.name or "") .. "，因 Core 不支持 " .. plugin .. " 插件"
+			return 1, "Sub-convert -> Drop SS node: " .. (node.name or "") .. "，Core does not support " .. plugin .. " plugin"
 		end
 	end
 
@@ -468,7 +468,7 @@ local function encode_anytls(node)
 		err_msg = "JLS"
 	end
 	if err_msg then
-		err_msg = "订阅转换 → 丢弃 AnyTLS 节点：" .. (node.name or "") .. "，因 Sing-Box 不支持 AnyTLS + " .. err_msg
+		err_msg = "Sub-convert -> Drop AnyTLS node: " .. (node.name or "") .. "，Sing-Box does not support AnyTLS + " .. err_msg
 		return 1, err_msg
 	end
 
@@ -519,13 +519,13 @@ local function encode_snell(node)
 		err_msg = obfs.mode
 	end
 	if err_msg then
-		err_msg = "订阅转换 → 丢弃 Snell 节点：" .. (node.name or "") .. "，因 Sing-Box 不支持 Snell + " .. err_msg
+		err_msg = "Sub-convert -> Drop Snell node: " .. (node.name or "") .. "，Sing-Box does not support Snell + " .. err_msg
 		return 1, err_msg
 	end
 	local version = node.version and tonumber(node.version) or 4
 	version = (version == 5) and 4 or version
 	if version < 4 then
-		err_msg = "订阅转换 → 丢弃 Snell 节点：" .. (node.name or "") .. "，因 Sing-Box 不支持 Snell 版本小于 4"
+		err_msg = "Sub-convert -> Drop Snell node: " .. (node.name or "") .. "，Sing-Box does not support Snell version < 4"
 		return 1, err_msg
 	end
 
@@ -564,7 +564,7 @@ local function encode_node(node)
 	elseif t == "anytls" then return encode_anytls(node)
 	elseif t == "ssr" then return encode_ssr(node)
 	elseif t == "snell" then return encode_snell(node)
-	else api.log("订阅转换 → 丢弃不支持的节点：" .. node.name .. "，节点类型：" .. t)
+	else api.log("Sub-convert -> Drop unsupported node: " .. node.name .. "，node type: " .. t)
 	end
 end
 
@@ -577,7 +577,7 @@ function parseClashNode(raw, remark)
 	if not data or type(data) ~= "table" then return raw end
 	if not data.proxies then return "" end
 
-	api.log('检测到 Clash 订阅，正在进行转换 ...')
+	api.log('Clash subscription detected, converting...')
 
 	-- Some airports use hosts domain redirect to disguise the real node domain name.
 	for k, v in pairs(data.hosts or {}) do
@@ -635,7 +635,7 @@ function parse_clash_sub_info(headers)
 		local t = os.date("*t", expire)
 		expired_date = string.format("%d-%d-%d", t.year, t.month, t.day)
 	else
-		expired_date = "长期有效"
+		expired_date = "No expiration"
 	end
 
 	return {

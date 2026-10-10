@@ -166,7 +166,7 @@ end
 table.sort(sortTable, function(a,b) return (a < b) end)
 
 for i, port in pairs(sortTable) do
-	log("  +  入口 %s:%s" % {bind_address, port})
+	log("  +  Inbound %s:%s" % {bind_address, port})
 
 	f_out:write("\n" .. string.format([[
 listen %s

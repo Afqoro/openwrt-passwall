@@ -76,7 +76,7 @@ test_node() {
 			sleep 2s 8>&- 9>&-
 			curlx="socks5h://127.0.0.1:${_tmp_port}"
 			_proxy_status=$(test_url "${probe_url}" ${retry_num} ${connect_timeout} "-x $curlx" 1)
-			# 结束 SS 插件进程
+			# Kill SS plugin process
 			pid_file="${TMP_PATH}/${test_flag}_plugin.pid"
 			[ -s "$pid_file" ] && kill -9 "$(head -n 1 "$pid_file")" >/dev/null 2>&1
 			busybox pgrep -af "${TMP_PATH}/${test_flag}[._]" | awk '! /socks_auto_switch\.sh/{print $1}' | xargs -r kill -9 >/dev/null 2>&1
@@ -124,24 +124,24 @@ try_switch_backup() {
 		fi
 		node_type=$(config_n_get $new_node type)
 		node_remarks=$(config_n_get $new_node remarks)
-		echolog "Socks切换检测：端口[${socks_port}] 尝试${node_role}【${node_type}：[$node_remarks]】"
+		echolog "Socks check: Port [${socks_port}] Try ${node_role}【${node_type}：[$node_remarks]】"
 
 		if test_node ${new_node}; then
 			check_process
-			echolog "Socks切换检测：端口[${socks_port}]【${node_type}：[$node_remarks]】正常，切换到此节点！"
+			echolog "Socks check: Port [${socks_port}]【${node_type}：[$node_remarks]】Healthy, switching to this node!"
 			if NO_REC_PROCESS=1 "$APP_FILE" socks_node_switch flag="$id" new_node="$new_node" 9>&-; then
-				echolog "Socks切换检测：端口[${socks_port}] 节点切换完毕！"
+				echolog "Socks check: Port [${socks_port}] Node switched successfully!"
 				return 0
 			fi
-			echolog "Socks切换检测：端口[${socks_port}] 节点切换失败，继续尝试其他节点！"
+			echolog "Socks check: Port [${socks_port}] Node switch failed, trying next node!"
 		else
-			echolog "Socks切换检测：端口[${socks_port}]【${node_type}：[$node_remarks]】异常。"
+			echolog "Socks check: Port [${socks_port}]【${node_type}：[$node_remarks]】Unhealthy."
 		fi
 		now_node="$new_node"
 		tried=$((tried + 1))
 	done
 
-	echolog "Socks切换检测：端口[${socks_port}] 所有节点均不可用或切换失败！"
+	echolog "Socks check: Port [${socks_port}] All nodes unavailable or switch failed!"
 	return 1
 }
 
@@ -233,7 +233,7 @@ start() {
 	backup_node=$(lua_api "get_socks_backup_nodes(\"${id}\")")
 	if [ -n "$backup_node" ]; then
 		backup_node_num=$(printf "%s\n" "$backup_node" | wc -w)
-		echolog "  - Socks切换检测：端口[${socks_port}] 后备节点数量：${backup_node_num}"
+		echolog "  - Socks check: Port [${socks_port}] Backup nodes count: ${backup_node_num}"
 		if [ "$backup_node_num" -eq 1 ]; then
 			[ "$main_node" = "$backup_node" ] && return
 		elif [ "$backup_node_num" -gt 1 ]; then
@@ -245,7 +245,7 @@ start() {
 			}
 		fi
 	else
-		echolog "  - Socks切换检测：端口[${socks_port}] 后备节点数量：0"
+		echolog "  - Socks check: Port [${socks_port}] Backup nodes count: 0"
 		return
 	fi
 	while [ -n "$backup_node" ]; do
