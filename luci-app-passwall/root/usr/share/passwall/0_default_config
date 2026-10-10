@@ -57,6 +57,13 @@ config global
 	option use_block_list '0'
 	option v2ray_dns_mode 'tcp+doh'
 	option socks_server '127.0.0.1:1070'
+	option node_socks_port '1070'
+	option filter_proxy_ipv6 '1'
+	option use_default_dns 'direct'
+	option chinadns_ng_default_tag 'none'
+	option dns_redirect '1'
+	option log_node '0'
+	option log_chinadns_ng '0'
 
 config global_haproxy
 	option balancing_enable '0'
@@ -77,6 +84,7 @@ config global_forwarding
 	option use_nft '1'
 	option tcp_proxy_way 'redirect'
 	option ipv6_tproxy '0'
+	option prefer_nft '1'
 
 config global_xray
 	option sniffing_override_dest '0'
@@ -91,6 +99,7 @@ config global_singbox
 
 config global_other
 	option auto_detection_time 'icmp'
+	option show_node_info '0'
 
 config global_rules
 	option chnlist_update '1'
@@ -109,6 +118,8 @@ config global_app
 	option brook_file '/usr/bin/brook'
 	option hysteria_file '/usr/bin/hysteria'
 	option chinadns_ng '/usr/bin/chinadns-ng'
+	option geoview_file '/usr/bin/geoview'
+	option sing_box_file '/usr/bin/sing-box'
 
 config global_subscribe
 	option filter_keyword_mode '1'
