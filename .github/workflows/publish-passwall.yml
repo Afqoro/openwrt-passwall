@@ -1,0 +1,122 @@
+name: Publish Passwall (Verified)
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: 'Nama artifact GitHub yang mau dipublish (kosongkan = artifact terbaru)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      PKG_NAME: passwall
+      TZ: Asia/Jakarta
+
+    steps:
+      - name: Resolve artifact to publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WANTED: ${{ inputs.artifact_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "$WANTED" ]; then
+            ARTIFACT_JSON=$(gh api "repos/$REPO/actions/artifacts?per_page=100" --jq ".artifacts[] | select(.name == \"$WANTED\")" | head -n 1)
+          else
+            ARTIFACT_JSON=$(gh api "repos/$REPO/actions/artifacts?per_page=100" --jq '.artifacts[] | select(.name | startswith("passwall-"))' | head -n 1)
+          fi
+
+          if [ -z "$ARTIFACT_JSON" ]; then
+            echo "Artifact not found" >&2
+            exit 1
+          fi
+
+          ARTIFACT_ID=$(echo "$ARTIFACT_JSON" | jq -r '.id')
+          ARTIFACT_NAME=$(echo "$ARTIFACT_JSON" | jq -r '.name')
+          PKG_VERSION=$(echo "$ARTIFACT_NAME" | awk -F'-' '{print $NF}')
+          ARCH=$(echo "$ARTIFACT_NAME" | awk -F'-' '{print $(NF-1)}')
+
+          echo "ARTIFACT_ID=$ARTIFACT_ID" >> "$GITHUB_ENV"
+          echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> "$GITHUB_ENV"
+          echo "PKG_VERSION=$PKG_VERSION" >> "$GITHUB_ENV"
+          echo "ARCH=$ARCH" >> "$GITHUB_ENV"
+          echo "ARCHIVE_NAME=${PKG_NAME}-${ARCH}-${PKG_VERSION}.tar.gz" >> "$GITHUB_ENV"
+          echo "Resolved artifact: $ARTIFACT_NAME (id=$ARTIFACT_ID)"
+
+      - name: Download artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" > artifact.zip
+          unzip -o artifact.zip -d artifact
+          ARCHIVE_PATH=$(find artifact -type f -name '*.tar.gz' | head -n 1)
+          if [ -z "$ARCHIVE_PATH" ]; then
+            echo "No .tar.gz inside artifact" >&2
+            exit 1
+          fi
+          mv "$ARCHIVE_PATH" "$ARCHIVE_NAME"
+          ls -lh "$ARCHIVE_NAME"
+
+      - name: Generate SHA256
+        run: |
+          set -euo pipefail
+          echo "SHA256=$(sha256sum "$ARCHIVE_NAME" | awk '{print $1}')" >> "$GITHUB_ENV"
+
+      - name: Upload to API endpoint + notify Telegram
+        env:
+          UPLOAD_URL: ${{ secrets.UPLOAD_URL }}
+          UPLOAD_API_KEY: ${{ secrets.UPLOAD_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          CAPTION="$(cat <<EOF
+          <b>Passwall build published</b>
+          <b>Mod by:</b> MahaVPN
+
+          <b>● File:</b> $PKG_NAME
+          <b>● Version:</b> $PKG_VERSION
+
+          <b>● Archive:</b> <code>$ARCHIVE_NAME</code>
+
+          <b>SHA256:</b> <code>${SHA256}</code>
+
+          <b>Status:</b> ✅ Verified & published manually
+          EOF
+          )"
+
+          RESPONSE="$(
+            curl --fail --show-error --silent \
+              -X POST "$UPLOAD_URL" \
+              -H "Authorization: Bearer $UPLOAD_API_KEY" \
+              -F "file=@$ARCHIVE_NAME" \
+              -F "category=ipk_mod_public" \
+              -F "subfolder=$ARCH" \
+              -F "repository=${{ github.repository }}" \
+              -F "sha256=${SHA256}" \
+              -F "notify_telegram=1" \
+              -F "telegram_conf_path=${{ secrets.TELEGRAM_CONF_PATH }}" \
+              -F "pkg_name=$PKG_NAME" \
+              -F "pkg_version=$PKG_VERSION" \
+              -F "arch=$ARCH" \
+              -F "mod_name=Afqoro" \
+              --form-string "caption=$CAPTION"
+          )"
+
+          python3 - <<'PY' "$RESPONSE"
+          import json, sys
+          data = json.loads(sys.argv[1])
+          print(f"{data.get('success')} - {data.get('message')}")
+          if data.get("data"):
+              import json as _json
+              print(_json.dumps(data["data"], indent=2))
+          PY

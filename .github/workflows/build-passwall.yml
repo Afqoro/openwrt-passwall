@@ -2,6 +2,11 @@ name: Build Passwall
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Upload archive ke endpoint + kirim Telegram'
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -366,6 +371,7 @@ jobs:
           fi
 
       - name: Upload file to API endpoint
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
         env:
           UPLOAD_URL: ${{ secrets.UPLOAD_URL }}
           UPLOAD_API_KEY: ${{ secrets.UPLOAD_API_KEY }}
